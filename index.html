@@ -124,7 +124,22 @@
   .tree > ul > li{padding-top:0;}
   .tree > ul > li::before, .tree > ul > li::after{display:none;}
 
-  .node{display:flex; gap:10px; align-items:stretch;}
+  .node{display:flex; gap:10px; align-items:flex-end;}
+
+  .col-wrap{display:flex; flex-direction:column; align-items:center; gap:6px;}
+  .parent-add{
+    width:auto; padding:2px 9px; height:20px;
+    border-radius:20px;
+    border:1px dashed var(--line);
+    background:transparent;
+    color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    white-space:nowrap;
+  }
+  .parent-add:hover{border-color:var(--gold); color:var(--gold); border-style:solid;}
 
   .card{
     background:var(--card);
@@ -288,10 +303,6 @@
   </header>
 
   <main>
-    <div id="setupNotice" style="display:none; max-width:640px; margin:0 auto 30px; background:#FFF4E0; border:1px solid #E4C27A; border-radius:12px; padding:18px 20px; font-size:14px; line-height:1.6; color:#5A4420;">
-      <strong>⚠️ Falta configurar la conexión con Google Sheets.</strong><br>
-      Abre este archivo .html en un editor de texto, busca la línea que dice <code>APPS_SCRIPT_URL</code> cerca del inicio del &lt;script&gt;, y pega ahí la URL de tu Web App de Google Apps Script. Sigue la guía paso a paso que te entregó Claude.
-    </div>
     <div class="tree-scroll" id="treeScroll">
       <div id="treeContainer"></div>
       <div class="unconnected-wrap" id="unconnectedWrap" style="display:none;">
@@ -319,12 +330,7 @@
 
 <script>
 (function(){
-  // ======================================================
-  // PEGA AQUÍ LA URL DE TU WEB APP DE GOOGLE APPS SCRIPT
-  // (la obtienes en el paso "Implementar > Aplicación web" de la guía)
-  // ======================================================
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbytmvi1hzHh3iEFm60P1VgyUEh00xVqiK5OCHmdYmqkW2uU9rohUxWXpC5atLquTiua/exec';
-
+  const STORAGE_KEY = 'family-tree-data-v1';
   let state = null; // {people:{}, unions:{}}
   let currentContext = null; // for modal actions
 
@@ -359,41 +365,22 @@
 
   function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
 
-  // ---------- Storage (Google Sheets vía Google Apps Script) ----------
-  function isConfigured(){
-    return APPS_SCRIPT_URL && APPS_SCRIPT_URL.indexOf('PASTE_YOUR_URL_HERE') === -1;
-  }
-
+  // ---------- Storage ----------
   async function loadState(){
-    if(!isConfigured()){
-      document.getElementById('setupNotice').style.display = 'block';
-      state = seedData(); // vista previa local, no se guardará hasta configurar la URL
-      return;
-    }
     try{
-      const res = await fetch(APPS_SCRIPT_URL, {cache:'no-store'});
-      const text = await res.text();
-      const parsed = JSON.parse(text);
-      if(parsed && parsed.people && Object.keys(parsed.people).length){
-        state = parsed;
+      const res = await window.storage.get(STORAGE_KEY, true);
+      if(res && res.value){
+        state = JSON.parse(res.value);
         return;
       }
-    }catch(e){
-      console.error(e);
-      showToast('No se pudo conectar con Google Sheets. Revisa la URL.');
-    }
+    }catch(e){ /* key doesn't exist yet */ }
     state = seedData();
     await saveState();
   }
 
   async function saveState(){
-    if(!isConfigured()) return; // modo vista previa, no persiste
     try{
-      await fetch(APPS_SCRIPT_URL, {
-        method:'POST',
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body: JSON.stringify(state)
-      });
+      await window.storage.set(STORAGE_KEY, JSON.stringify(state), true);
     }catch(e){
       showToast('No se pudo guardar. Revisa tu conexión.');
       console.error(e);
@@ -462,7 +449,7 @@
       container.innerHTML = '<div class="empty"><h2>Aún no hay nadie en el árbol</h2><p>Usa "+ Agregar persona" para comenzar.</p></div>';
     } else {
       let html = '<div class="tree"><ul>';
-      roots.forEach(r => { html += renderEntityLi(r.type, r.id); });
+      roots.forEach(r => { html += renderEntityLi(r.type, r.id, childIds); });
       html += '</ul></div>';
       container.innerHTML = html;
     }
@@ -474,14 +461,13 @@
     attachCardHandlers();
   }
 
-  function personCardHTML(p, opts){
-    opts = opts || {};
+  function personCardHTML(p, childIdsSet){
     const av = p.photo
       ? `<img src="${escapeAttr(p.photo)}" alt="">`
       : initials(p.name || '?');
     const sexClass = p.sex === 'M' ? 'f' : '';
     const dl = datesLabel(p);
-    return `
+    const card = `
       <div class="card" data-person="${p.id}">
         <div class="avatar ${sexClass}">${p.photo ? av : av}</div>
         <div>
@@ -489,9 +475,15 @@
           ${dl ? `<div class="dates">${dl}</div>` : ''}
         </div>
       </div>`;
+    const hasParents = childIdsSet && childIdsSet.has(p.id);
+    if(hasParents) return card;
+    return `<div class="col-wrap">
+        <button class="parent-add" data-add-parent="${p.id}" title="Agregar padres">▲ padres</button>
+        ${card}
+      </div>`;
   }
 
-  function renderEntityLi(type, id){
+  function renderEntityLi(type, id, childIdsSet){
     let nodeHtml = '';
     let childrenIds = [];
 
@@ -499,7 +491,7 @@
       const u = state.unions[id];
       nodeHtml = '<div class="node">';
       u.partners.forEach((pid, idx) => {
-        nodeHtml += personCardHTML(state.people[pid]);
+        nodeHtml += personCardHTML(state.people[pid], childIdsSet);
       });
       if(u.partners.length < 2){
         nodeHtml += `<div class="union-plus" data-add-spouse-union="${u.id}" title="Agregar cónyuge">+</div>`;
@@ -508,7 +500,7 @@
       childrenIds = u.children;
     } else {
       const p = state.people[id];
-      nodeHtml = '<div class="node">' + personCardHTML(p);
+      nodeHtml = '<div class="node">' + personCardHTML(p, childIdsSet);
       nodeHtml += `<div class="union-plus" data-add-spouse-person="${id}" title="Agregar cónyuge">+</div>`;
       nodeHtml += '</div>';
     }
@@ -523,9 +515,9 @@
       childrenIds.forEach(cid => {
         const cu = findUnionByPartner(cid);
         if(cu){
-          li += renderEntityLi('union', cu.id);
+          li += renderEntityLi('union', cu.id, childIdsSet);
         } else {
-          li += renderEntityLi('person', cid);
+          li += renderEntityLi('person', cid, childIdsSet);
         }
       });
       li += '</ul>';
@@ -555,6 +547,9 @@
     });
     document.querySelectorAll('[data-add-child]').forEach(el=>{
       el.onclick = (e)=>{ e.stopPropagation(); openAddChild(el.getAttribute('data-add-child')); };
+    });
+    document.querySelectorAll('[data-add-parent]').forEach(el=>{
+      el.onclick = (e)=>{ e.stopPropagation(); openAddParents(el.getAttribute('data-add-parent')); };
     });
   }
 
@@ -763,6 +758,136 @@
     closeModal();
     render();
     showToast('Hijo/a agregado');
+  }
+
+  function personFormFieldsPrefixed(prefix, p){
+    p = p || {name:'', birth:'', death:'', photo:''};
+    return `
+      <div class="field">
+        <label>Nombre completo</label>
+        <input type="text" id="${prefix}_name" value="${escapeAttr(p.name||'')}" placeholder="Nombre Apellido">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Fecha nacimiento</label>
+          <input type="date" id="${prefix}_birth" value="${p.birth||''}">
+        </div>
+        <div class="field">
+          <label>Fecha fallecimiento</label>
+          <input type="date" id="${prefix}_death" value="${p.death||''}">
+        </div>
+      </div>
+      <div class="field">
+        <label>Foto (URL, opcional)</label>
+        <input type="url" id="${prefix}_photo" value="${escapeAttr(p.photo||'')}" placeholder="https://...">
+      </div>
+    `;
+  }
+
+  function openAddParents(personId){
+    currentContext = {mode:'parents', personId};
+    const person = state.people[personId];
+    const existingOptions = Object.values(state.people)
+      .filter(p => p.id !== personId)
+      .map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+
+    openModal('Agregar padres de ' + person.name, `
+      <p class="hint">Completa uno o ambos. Si la persona ya existe en el árbol, puedes vincularla en vez de crear una nueva.</p>
+      <div style="border:1px solid var(--paper-2); border-radius:10px; padding:12px; margin-bottom:14px;">
+        <label style="display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--sage-dark); margin-bottom:8px;">Padre</label>
+        <select id="f_mode_father" style="margin-bottom:10px; width:100%; padding:8px; border-radius:8px; border:1px solid var(--paper-2);">
+          <option value="none">No agregar</option>
+          <option value="new">Persona nueva</option>
+          ${existingOptions ? '<option value="existing">Vincular persona existente</option>' : ''}
+        </select>
+        <div id="fatherFields"></div>
+      </div>
+      <div style="border:1px solid var(--paper-2); border-radius:10px; padding:12px; margin-bottom:14px;">
+        <label style="display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--wine-dark); margin-bottom:8px;">Madre</label>
+        <select id="f_mode_mother" style="margin-bottom:10px; width:100%; padding:8px; border-radius:8px; border:1px solid var(--paper-2);">
+          <option value="none">No agregar</option>
+          <option value="new">Persona nueva</option>
+          ${existingOptions ? '<option value="existing">Vincular persona existente</option>' : ''}
+        </select>
+        <div id="motherFields"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="cancelBtn">Cancelar</button>
+        <button class="btn btn-primary" id="saveBtn">Guardar</button>
+      </div>
+    `);
+
+    function refreshFatherFields(){
+      const mode = document.getElementById('f_mode_father').value;
+      const el = document.getElementById('fatherFields');
+      if(mode === 'new') el.innerHTML = personFormFieldsPrefixed('father');
+      else if(mode === 'existing') el.innerHTML = `<div class="field"><label>Selecciona persona</label><select id="father_existing">${existingOptions}</select></div>`;
+      else el.innerHTML = '';
+    }
+    function refreshMotherFields(){
+      const mode = document.getElementById('f_mode_mother').value;
+      const el = document.getElementById('motherFields');
+      if(mode === 'new') el.innerHTML = personFormFieldsPrefixed('mother');
+      else if(mode === 'existing') el.innerHTML = `<div class="field"><label>Selecciona persona</label><select id="mother_existing">${existingOptions}</select></div>`;
+      else el.innerHTML = '';
+    }
+    document.getElementById('f_mode_father').onchange = refreshFatherFields;
+    document.getElementById('f_mode_mother').onchange = refreshMotherFields;
+
+    document.getElementById('cancelBtn').onclick = closeModal;
+    document.getElementById('saveBtn').onclick = handleSaveParents;
+  }
+
+  async function handleSaveParents(){
+    const personId = currentContext.personId;
+    const fatherMode = document.getElementById('f_mode_father').value;
+    const motherMode = document.getElementById('f_mode_mother').value;
+    let fatherId = null, motherId = null;
+
+    if(fatherMode === 'existing'){
+      fatherId = document.getElementById('father_existing').value;
+    } else if(fatherMode === 'new'){
+      const name = document.getElementById('father_name').value.trim();
+      if(name){
+        fatherId = uid('p');
+        state.people[fatherId] = {
+          id:fatherId, name,
+          birth:document.getElementById('father_birth').value,
+          death:document.getElementById('father_death').value,
+          sex:'H',
+          photo:document.getElementById('father_photo').value.trim()
+        };
+      }
+    }
+    if(motherMode === 'existing'){
+      motherId = document.getElementById('mother_existing').value;
+    } else if(motherMode === 'new'){
+      const name = document.getElementById('mother_name').value.trim();
+      if(name){
+        motherId = uid('p');
+        state.people[motherId] = {
+          id:motherId, name,
+          birth:document.getElementById('mother_birth').value,
+          death:document.getElementById('mother_death').value,
+          sex:'M',
+          photo:document.getElementById('mother_photo').value.trim()
+        };
+      }
+    }
+
+    if(!fatherId && !motherId){
+      showToast('Agrega al menos un padre o madre');
+      return;
+    }
+
+    const partners = [fatherId, motherId].filter(Boolean);
+    const newUnionId = uid('u');
+    state.unions[newUnionId] = {id:newUnionId, partners, children:[personId]};
+
+    await saveState();
+    closeModal();
+    render();
+    showToast('Padres agregados');
   }
 
   async function handleSaveNewPerson(){
