@@ -303,6 +303,10 @@
   </header>
 
   <main>
+    <div id="setupNotice" style="display:none; max-width:640px; margin:0 auto 30px; background:#FFF4E0; border:1px solid #E4C27A; border-radius:12px; padding:18px 20px; font-size:14px; line-height:1.6; color:#5A4420;">
+      <strong>⚠️ Falta configurar la conexión con Google Sheets.</strong><br>
+      Abre este archivo .html en un editor de texto, busca la línea que dice <code>APPS_SCRIPT_URL</code> cerca del inicio del &lt;script&gt;, y pega ahí la URL de tu Web App de Google Apps Script. Sigue la guía paso a paso que te entregó Claude.
+    </div>
     <div class="tree-scroll" id="treeScroll">
       <div id="treeContainer"></div>
       <div class="unconnected-wrap" id="unconnectedWrap" style="display:none;">
@@ -330,7 +334,12 @@
 
 <script>
 (function(){
-  const STORAGE_KEY = 'family-tree-data-v1';
+  // ======================================================
+  // PEGA AQUÍ LA URL DE TU WEB APP DE GOOGLE APPS SCRIPT
+  // (la obtienes en el paso "Implementar > Aplicación web" de la guía)
+  // ======================================================
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbytmvi1hzHh3iEFm60P1VgyUEh00xVqiK5OCHmdYmqkW2uU9rohUxWXpC5atLquTiua/exec';
+
   let state = null; // {people:{}, unions:{}}
   let currentContext = null; // for modal actions
 
@@ -365,22 +374,42 @@
 
   function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
 
-  // ---------- Storage ----------
+  // ---------- Storage (Google Sheets vía Google Apps Script) ----------
+  function isConfigured(){
+    return APPS_SCRIPT_URL && APPS_SCRIPT_URL.indexOf('PASTE_YOUR_URL_HERE') === -1;
+  }
+
   async function loadState(){
+    if(!isConfigured()){
+      document.getElementById('setupNotice').style.display = 'block';
+      state = seedData(); // vista previa local, no se guardará hasta configurar la URL
+      return;
+    }
     try{
-      const res = await window.storage.get(STORAGE_KEY, true);
-      if(res && res.value){
-        state = JSON.parse(res.value);
+      const res = await fetch(APPS_SCRIPT_URL, {cache:'no-store'});
+      const text = await res.text();
+      const parsed = JSON.parse(text);
+      if(parsed && parsed.people && Object.keys(parsed.people).length){
+        state = parsed;
         return;
       }
-    }catch(e){ /* key doesn't exist yet */ }
+    }catch(e){
+      console.error(e);
+      showToast('No se pudo conectar con Google Sheets. Revisa la URL.');
+    }
     state = seedData();
     await saveState();
   }
 
   async function saveState(){
+    if(!isConfigured()) return; // modo vista previa, no persiste
     try{
-      await window.storage.set(STORAGE_KEY, JSON.stringify(state), true);
+      await fetch(APPS_SCRIPT_URL, {
+        method:'POST',
+        mode:'no-cors',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify(state)
+      });
     }catch(e){
       showToast('No se pudo guardar. Revisa tu conexión.');
       console.error(e);
