@@ -193,18 +193,36 @@
   .tree > ul > li::before, .tree > ul > li::after{display:none;}
 
   .anchor-multi{display:flex; justify-content:center;}
-  .multi-union-ul{padding-top:30px !important;}
-  .multi-union-ul::before{
-    border-left-color:var(--sage) !important;
-    border-left-style:dashed !important;
-    height:30px !important;
+
+  /* Ramas de "también con..." — dibujo propio, independiente de las líneas
+     normales del árbol (para no pisarse con esas y generar artefactos raros). */
+  .multi-union-ul{
+    display:flex;
+    list-style:none;
+    padding:0;
+    margin:26px 0 0;
+    position:relative;
+    border-top:2px dashed var(--sage);
   }
-  .multi-union-ul > .union-branch{padding-top:30px !important;}
-  .multi-union-ul > .union-branch::before, .multi-union-ul > .union-branch::after{
-    border-color:var(--sage) !important;
-    border-top-style:dashed !important;
-    border-left-style:dashed !important;
-    height:30px !important;
+  .multi-union-ul::before{
+    content:'';
+    position:absolute; top:-26px; left:50%;
+    width:0; height:26px;
+    border-left:2px dashed var(--sage);
+  }
+  .multi-union-ul > .union-branch{
+    list-style:none;
+    padding:0 16px;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .multi-union-ul > .union-branch::before,
+  .multi-union-ul > .union-branch::after{
+    content:none !important;
+  }
+  .branch-stem{
+    width:0; height:16px;
+    border-left:2px dashed var(--sage);
+    margin-bottom:4px;
   }
   .branch-label{
     font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.05em;
@@ -526,7 +544,7 @@
   // PEGA AQUÍ LA URL DE TU WEB APP DE GOOGLE APPS SCRIPT
   // (la obtienes en el paso "Implementar > Aplicación web" de la guía)
   // ======================================================
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbytmvi1hzHh3iEFm60P1VgyUEh00xVqiK5OCHmdYmqkW2uU9rohUxWXpC5atLquTiua/exec';
+  const APPS_SCRIPT_URL ='https://script.google.com/macros/s/AKfycbytmvi1hzHh3iEFm60P1VgyUEh00xVqiK5OCHmdYmqkW2uU9rohUxWXpC5atLquTiua/exec';
 
   let state = null; // {people:{}, unions:{}}
   let currentContext = null; // for modal actions
@@ -816,7 +834,8 @@
     unions.forEach((u, idx)=>{
       const built = buildNode('union', u.id, childIdsSet, cid);
       html += '<li class="union-branch">';
-      html += `<div class="branch-label">${idx===0 ? 'Con' : 'Con'}</div>`;
+      html += '<div class="branch-stem"></div>';
+      html += `<div class="branch-label">${idx===0 ? 'Con' : 'También con'}</div>`;
       html += nodeBlockHTML(built);
       html += childrenBlockHTML(built, childIdsSet);
       html += '</li>';
@@ -1412,15 +1431,12 @@
     // Buttons
     document.getElementById('zoomIn').onclick = ()=>{ scale = clampScale(scale + 0.15); applyTransform(); };
     document.getElementById('zoomOut').onclick = ()=>{ scale = clampScale(scale - 0.15); applyTransform(); };
-    document.getElementById('zoomReset').onclick = ()=>{ scale = 1; panX = 24; panY = 12; applyTransform(); };
 	document.getElementById('zoomReset').onclick = ()=>{
 	scale = 1;
 	applyTransform();
 	const card = Array.from(document.querySelectorAll('.card .name'))
 		.find(el => el.textContent.trim() === 'Urbano Palomino Villalobos');
 	if(card) centerOnCard(card.closest('.card'));
-};
-	
   })();
 
   document.addEventListener('click', (e)=>{
