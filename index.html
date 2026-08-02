@@ -195,20 +195,16 @@
   .anchor-multi{display:flex; justify-content:center;}
 
   /* Ramas de "también con..." — dibujo propio, independiente de las líneas
-     normales del árbol (para no pisarse con esas y generar artefactos raros). */
+     normales del árbol (para no pisarse con esas y generar artefactos raros).
+     Cada rama tiene su propio "tallo" corto e independiente — así no se estira
+     un borde compartido cuando una de las ramas tiene un subárbol muy ancho. */
   .multi-union-ul{
     display:flex;
     list-style:none;
     padding:0;
-    margin:26px 0 0;
-    position:relative;
-    border-top:2px dashed var(--sage);
-  }
-  .multi-union-ul::before{
-    content:'';
-    position:absolute; top:-26px; left:50%;
-    width:0; height:26px;
-    border-left:2px dashed var(--sage);
+    margin:20px 0 0;
+    justify-content:center;
+    gap:28px;
   }
   .multi-union-ul > .union-branch{
     list-style:none;
