@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -308,14 +307,14 @@
   .union-plus:hover{background:var(--gold); color:#2A2010; border-style:solid;}
 
   .child-add{
-    margin-top:44px;
-    width:36px; height:36px; border-radius:50%;
-    border:1.5px dashed var(--line);
-    background:transparent;
-    color:var(--muted);
-    font-size:16px;
-    cursor:pointer;
-    display:flex;align-items:center;justify-content:center;
+    margin-top: 10px;
+    width: 25px; height: 25px; border-radius: 50%;
+    border: 1.5px dashed var(--line);
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
   }
   .child-add:hover{border-color:var(--gold); color:var(--gold);}
 
@@ -505,6 +504,21 @@
 
   function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
 
+  // Removes unions that serve no purpose: no partners at all, or a single
+  // partner with no children (these are left behind after deleting a test
+  // spouse/child and would otherwise show up as empty dangling branches).
+  function cleanupOrphanUnions(){
+    let changed = false;
+    Object.keys(state.unions).forEach(uid=>{
+      const u = state.unions[uid];
+      if(u.partners.length === 0 || (u.partners.length < 2 && u.children.length === 0)){
+        delete state.unions[uid];
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
   // ---------- Storage (Google Sheets vía Google Apps Script) ----------
   function isConfigured(){
     return APPS_SCRIPT_URL && APPS_SCRIPT_URL.indexOf('PASTE_YOUR_URL_HERE') === -1;
@@ -522,6 +536,7 @@
       const parsed = JSON.parse(text);
       if(parsed && parsed.people && Object.keys(parsed.people).length){
         state = parsed;
+        if(cleanupOrphanUnions()) await saveState();
         return;
       }
     }catch(e){
@@ -796,7 +811,7 @@
         <label>Vínculo</label>
         <div class="sex-toggle">
           <button type="button" class="blood-btn ${bloodVal?'active':''}" data-blood="1">Línea de sangre</button>
-          <button type="button" class="blood-btn ${!bloodVal?'active':''}" data-blood="0">Cónyuge </button>
+          <button type="button" class="blood-btn ${!bloodVal?'active':''}" data-blood="0">Cónyuge</button>
         </div>
       </div>
       <div class="field">
@@ -1165,13 +1180,8 @@
         u.partners = u.partners.filter(id=>id!==personId);
         u.children = u.children.filter(id=>id!==personId);
       });
-      // Remove unions that now have zero partners and zero children
-      Object.keys(state.unions).forEach(uid=>{
-        const u = state.unions[uid];
-        if(u.partners.length === 0){
-          delete state.unions[uid];
-        }
-      });
+      // Remove unions left with no purpose (no partners, or a lone partner with no children)
+      cleanupOrphanUnions();
       delete state.people[personId];
       await saveState();
       closeModal();
