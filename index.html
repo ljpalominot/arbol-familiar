@@ -723,12 +723,13 @@
   }
 
   // Mide cada grupo de ramas "también con..." y dibuja la barra conectora
-  // exactamente entre el centro de la primera y la última rama — nunca más
-  // ancha que eso, sin importar cuántos descendientes tenga cada una.
+  // exactamente entre el centro de la primera y la última rama de ESE grupo
+  // (usando :scope para no mezclarse con grupos anidados más abajo).
   function positionMultiUnionConnectors(){
     document.querySelectorAll('.multi-branches-wrap').forEach(wrap=>{
-      const bar = wrap.querySelector('.branch-connector');
-      const stems = wrap.querySelectorAll('.union-branch > .branch-stem');
+      const bar = wrap.querySelector(':scope > .branch-connector');
+      const ul = wrap.querySelector(':scope > .multi-union-ul');
+      const stems = ul ? ul.querySelectorAll(':scope > .union-branch > .branch-stem') : [];
       if(!bar || stems.length < 2){
         if(bar) bar.style.display = 'none';
         return;
