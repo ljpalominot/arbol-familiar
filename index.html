@@ -484,12 +484,12 @@
     <h1 id="familyTitle">Familia Palomino</h1>
     <p class="sub">Los cambios se guardan automáticamente.</p>
     <div class="toolbar">
-      <button class="btn btn-primary" id="btnAddRoot">+ Agregar persona</button>
-      <button class="btn btn-ghost" id="btnResetView" title="Recargar datos guardados">↻ Actualizar</button>
-      <button class="btn btn-ghost" id="btnCollapseAll" title="Contraer todas las ramas">⊟ Contraer todo</button>
-      <button class="btn btn-ghost" id="btnExpandAll" title="Expandir todas las ramas">⊞ Expandir todo</button>
+      <button class="btn btn-primary" id="btnAddRoot">+ Agregar</button>
+      <button class="btn btn-ghost" id="btnResetView" title="Recargar datos guardados">↻</button>
+      <button class="btn btn-ghost" id="btnCollapseAll" title="Contraer todas las ramas">⊟ Contraer</button>
+      <button class="btn btn-ghost" id="btnExpandAll" title="Expandir todas las ramas">⊞ Expandir</button>
       <div class="search-wrap">
-        <input type="text" id="searchInput" placeholder="🔍 Buscar persona..." autocomplete="off">
+        <input type="text" id="searchInput" placeholder="🔍 Buscar..." autocomplete="off">
         <div class="search-results" id="searchResults"></div>
       </div>
     </div>
@@ -1525,6 +1525,10 @@
   (async function init(){
     await loadState();
     render();
+  const initialCard = Array.from(document.querySelectorAll('.card .name'))
+    .find(el => el.textContent.trim() === 'Urbano Palomino Villalobos');
+  if(initialCard) centerOnCard(initialCard.closest('.card'));
+  
   })();
 })();
 </script>
