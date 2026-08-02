@@ -246,7 +246,7 @@
     transform:translateY(-2px);
     border-color:var(--gold);
   }
-  .card.blood{border-left:4px solid var(--blood-border);}
+  .card.blood{border-left:8px solid var(--blood-border);}
   .card.spouse{border-left:4px solid var(--spouse-border);}
 
   @keyframes highlightPulse{
@@ -266,6 +266,39 @@
     cursor:pointer;
   }
   .mini-plus:hover{background:var(--gold); color:#2A2010; border-style:solid;}
+  .partner-wrap{position:relative;}
+
+  /* En computadora (mouse real): los botones "+" solo aparecen al pasar el cursor.
+     En celular/tablet (sin hover confiable) se quedan siempre visibles. */
+  @media (hover: hover) and (pointer: fine){
+    .union-plus, .mini-plus, .child-add, .parent-add{
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .15s ease;
+    }
+    .node:hover .union-plus{opacity:1; pointer-events:auto;}
+    .partner-wrap:hover .mini-plus{opacity:1; pointer-events:auto;}
+    .node-wrap:hover .child-add{opacity:1; pointer-events:auto;}
+    .col-wrap:hover .parent-add{opacity:1; pointer-events:auto;}
+    .anchor-multi:hover .union-plus{opacity:1; pointer-events:auto;}
+  }
+
+  /* En celular/tablet: los botones "+" aparecen al tocar la tarjeta (no con hover). */
+  @media (hover: none), (pointer: coarse){
+    .union-plus, .mini-plus, .child-add, .parent-add{
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .15s ease;
+    }
+    .node-wrap.revealed .union-plus,
+    .node-wrap.revealed .mini-plus,
+    .node-wrap.revealed .child-add,
+    .node-wrap.revealed .parent-add,
+    .anchor-multi.revealed .union-plus{
+      opacity:1;
+      pointer-events:auto;
+    }
+  }
   .avatar{
     width:38px; height:38px; border-radius:50%;
     flex:none;
@@ -372,7 +405,7 @@
   .sex-btn.active{background:var(--sage); color:#fff; border-color:var(--sage);}
   .sex-btn.active.f{background:var(--wine); border-color:var(--wine);}
   .blood-btn{
-    flex:1; padding:9px 6px; border-radius:8px; border:5px solid var(--paper-2); background:#fff;
+    flex:1; padding:9px 6px; border-radius:8px; border:1px solid var(--paper-2); background:#fff;
     cursor:pointer; font-size:12px; font-weight:600; color:var(--muted);
   }
   .blood-btn.active{background:var(--gold); color:#2A2010; border-color:var(--gold);}
@@ -674,7 +707,7 @@
       u.partners.forEach(pid => {
         if(pid === hidePartnerId) return;
         const cardHtml = personCardHTML(state.people[pid], childIdsSet);
-        nodeHtml += `<div style="position:relative;">${cardHtml}<button class="mini-plus" data-add-spouse-person="${pid}" title="Agregar otra pareja">+</button></div>`;
+        nodeHtml += `<div class="partner-wrap">${cardHtml}<button class="mini-plus" data-add-spouse-person="${pid}" title="Agregar otra pareja">+</button></div>`;
       });
       if(u.partners.length < 2){
         nodeHtml += `<div class="union-plus" data-add-spouse-union="${u.id}" title="Agregar cónyuge">+</div>`;
@@ -743,11 +776,23 @@
   }
   function escapeAttr(str){ return escapeHtml(str); }
 
+  function isTouchDevice(){
+    return window.matchMedia('(hover: none), (pointer: coarse)').matches;
+  }
+
   // ---------- Card / button interactions ----------
   function attachCardHandlers(){
     document.querySelectorAll('[data-person]').forEach(el=>{
       el.onclick = (e)=>{
         e.stopPropagation();
+        if(isTouchDevice()){
+          const container = el.closest('.node-wrap') || el.closest('.anchor-multi');
+          if(container && !container.classList.contains('revealed')){
+            document.querySelectorAll('.revealed').forEach(c=>c.classList.remove('revealed'));
+            container.classList.add('revealed');
+            return; // primer toque: solo revela los botones "+"
+          }
+        }
         openEditPerson(el.getAttribute('data-person'));
       };
     });
@@ -808,10 +853,10 @@
         </div>
       </div>
       <div class="field">
-        <label>Vínculo</label>
+        <label>Vínculo con la familia</label>
         <div class="sex-toggle">
           <button type="button" class="blood-btn ${bloodVal?'active':''}" data-blood="1">Línea de sangre</button>
-          <button type="button" class="blood-btn ${!bloodVal?'active':''}" data-blood="0">Cónyuge</button>
+          <button type="button" class="blood-btn ${!bloodVal?'active':''}" data-blood="0">Cónyuge (se unió por matrimonio)</button>
         </div>
       </div>
       <div class="field">
@@ -1290,6 +1335,12 @@
     document.getElementById('zoomOut').onclick = ()=>{ scale = clampScale(scale - 0.15); applyTransform(); };
     document.getElementById('zoomReset').onclick = ()=>{ scale = 1; panX = 24; panY = 12; applyTransform(); };
   })();
+
+  document.addEventListener('click', (e)=>{
+    if(!e.target.closest('.node-wrap') && !e.target.closest('.anchor-multi')){
+      document.querySelectorAll('.revealed').forEach(c=>c.classList.remove('revealed'));
+    }
+  });
 
   // ---------- Buscador ----------
   function normalizeText(str){
