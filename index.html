@@ -835,7 +835,7 @@
       const built = buildNode('union', u.id, childIdsSet, cid);
       html += '<li class="union-branch">';
       html += '<div class="branch-stem"></div>';
-      html += `<div class="branch-label">${idx===0 ? 'Con' : 'También con'}</div>`;
+      html += `<div class="branch-label">${idx===0 ? 'Con' : 'Con'}</div>`;
       html += nodeBlockHTML(built);
       html += childrenBlockHTML(built, childIdsSet);
       html += '</li>';
