@@ -718,8 +718,8 @@
     // show persons who are "orphans" meaning single & not connected as spouse/child to guide user; here we skip since roots cover them.
     document.getElementById('unconnectedWrap').style.display = 'none';
 
-    attachCardHandlers();
-    positionMultiUnionConnectors();
+    try{ attachCardHandlers(); }catch(err){ console.error('Error en attachCardHandlers:', err); }
+    try{ positionMultiUnionConnectors(); }catch(err){ console.error('Error en positionMultiUnionConnectors:', err); }
   }
 
   // Mide cada grupo de ramas "también con..." y dibuja la barra conectora
@@ -727,20 +727,26 @@
   // (usando :scope para no mezclarse con grupos anidados más abajo).
   function positionMultiUnionConnectors(){
     document.querySelectorAll('.multi-branches-wrap').forEach(wrap=>{
-      const bar = wrap.querySelector(':scope > .branch-connector');
-      const ul = wrap.querySelector(':scope > .multi-union-ul');
-      const stems = ul ? ul.querySelectorAll(':scope > .union-branch > .branch-stem') : [];
-      if(!bar || stems.length < 2){
-        if(bar) bar.style.display = 'none';
-        return;
+      try{
+        const bar = wrap.querySelector('.branch-connector');
+        const ul = wrap.querySelector('.multi-union-ul');
+        if(!bar || !ul) return;
+        const branchLis = Array.from(ul.children).filter(li => li.classList && li.classList.contains('union-branch'));
+        const stems = branchLis.map(li => li.querySelector('.branch-stem')).filter(Boolean);
+        if(stems.length < 2){
+          bar.style.display = 'none';
+          return;
+        }
+        const first = stems[0];
+        const last = stems[stems.length - 1];
+        const firstCenter = first.offsetLeft + first.offsetWidth / 2;
+        const lastCenter = last.offsetLeft + last.offsetWidth / 2;
+        bar.style.display = 'block';
+        bar.style.left = firstCenter + 'px';
+        bar.style.width = Math.max(0, lastCenter - firstCenter) + 'px';
+      }catch(err){
+        console.error('Error al posicionar una barra conectora:', err);
       }
-      const first = stems[0];
-      const last = stems[stems.length - 1];
-      const firstCenter = first.offsetLeft + first.offsetWidth / 2;
-      const lastCenter = last.offsetLeft + last.offsetWidth / 2;
-      bar.style.display = 'block';
-      bar.style.left = firstCenter + 'px';
-      bar.style.width = Math.max(0, lastCenter - firstCenter) + 'px';
     });
   }
 
