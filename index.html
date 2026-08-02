@@ -196,13 +196,21 @@
 
   /* Ramas de "también con..." — dibujo propio, independiente de las líneas
      normales del árbol (para no pisarse con esas y generar artefactos raros).
-     Cada rama tiene su propio "tallo" corto e independiente — así no se estira
-     un borde compartido cuando una de las ramas tiene un subárbol muy ancho. */
+     La barra conectora (.branch-connector) se mide y posiciona con JS después
+     de cada render, para que llegue EXACTO de un "CON" al otro, sin importar
+     cuántos descendientes tenga cada rama. */
+  .multi-branches-wrap{ position:relative; margin:20px 0 0; }
+  .branch-connector{
+    position:absolute; top:0; height:0;
+    border-top:2px dashed var(--sage);
+    pointer-events:none;
+    display:none;
+  }
   .multi-union-ul{
     display:flex;
     list-style:none;
     padding:0;
-    margin:20px 0 0;
+    margin:0;
     justify-content:center;
     gap:28px;
   }
@@ -711,6 +719,28 @@
     document.getElementById('unconnectedWrap').style.display = 'none';
 
     attachCardHandlers();
+    positionMultiUnionConnectors();
+  }
+
+  // Mide cada grupo de ramas "también con..." y dibuja la barra conectora
+  // exactamente entre el centro de la primera y la última rama — nunca más
+  // ancha que eso, sin importar cuántos descendientes tenga cada una.
+  function positionMultiUnionConnectors(){
+    document.querySelectorAll('.multi-branches-wrap').forEach(wrap=>{
+      const bar = wrap.querySelector('.branch-connector');
+      const stems = wrap.querySelectorAll('.union-branch > .branch-stem');
+      if(!bar || stems.length < 2){
+        if(bar) bar.style.display = 'none';
+        return;
+      }
+      const first = stems[0];
+      const last = stems[stems.length - 1];
+      const firstCenter = first.offsetLeft + first.offsetWidth / 2;
+      const lastCenter = last.offsetLeft + last.offsetWidth / 2;
+      bar.style.display = 'block';
+      bar.style.left = firstCenter + 'px';
+      bar.style.width = Math.max(0, lastCenter - firstCenter) + 'px';
+    });
   }
 
   function personCardHTML(p, childIdsSet){
@@ -826,7 +856,7 @@
     }
     let html = '<li>';
     html += `<div class="anchor-multi"><div class="node">${personCardHTML(state.people[cid], childIdsSet)}<div class="union-plus" data-add-spouse-person="${cid}" title="Agregar otra pareja">+</div></div></div>`;
-    html += '<ul class="multi-union-ul">';
+    html += '<div class="multi-branches-wrap"><div class="branch-connector"></div><ul class="multi-union-ul">';
     unions.forEach((u, idx)=>{
       const built = buildNode('union', u.id, childIdsSet, cid);
       html += '<li class="union-branch">';
@@ -836,7 +866,7 @@
       html += childrenBlockHTML(built, childIdsSet);
       html += '</li>';
     });
-    html += '</ul></li>';
+    html += '</ul></div></li>';
     return html;
   }
 
