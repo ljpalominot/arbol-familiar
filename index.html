@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -20,6 +21,10 @@
     --line:#8C8267;
     --muted:#7A7261;
     --shadow: 0 1px 2px rgba(33,28,22,0.10), 0 6px 16px rgba(33,28,22,0.08);
+
+    /* ---- Colores editables: línea de sangre vs. cónyuges ---- */
+    --blood-border:#AD8636;   /* borde de quienes descienden de sangre de la familia */
+    --spouse-border:#9AA79A;  /* borde de quienes se unieron por matrimonio (no son sangre) */
   }
   *{box-sizing:border-box;}
   body{
@@ -88,9 +93,73 @@
   .btn-ghost{background:rgba(255,255,255,0.12); color:#F4EEE0; border:1px solid rgba(255,255,255,0.25);}
   .btn-ghost:hover{background:rgba(255,255,255,0.2);}
 
-  /* Tree area */
-  main{flex:1; overflow:auto; padding:40px 24px 80px;}
+  .search-wrap{position:relative;}
+  .search-wrap input{
+    width:220px; padding:10px 14px; border-radius:8px;
+    border:1px solid rgba(255,255,255,0.28); background:rgba(255,255,255,0.1);
+    color:#F4EEE0; font-family:'Inter',sans-serif; font-size:13px;
+  }
+  .search-wrap input::placeholder{color:#D9C79B;}
+  .search-wrap input:focus{outline:none; border-color:var(--gold); background:rgba(255,255,255,0.16);}
+  .search-results{
+    position:absolute; top:calc(100% + 6px); left:0; width:260px;
+    background:var(--card); border-radius:10px; box-shadow:0 12px 30px rgba(0,0,0,.3);
+    overflow:hidden; z-index:30; display:none;
+  }
+  .search-results.open{display:block;}
+  .search-item{
+    padding:9px 13px; font-size:13px; color:var(--ink); cursor:pointer;
+    border-bottom:1px solid var(--paper-2); font-family:'Inter',sans-serif;
+  }
+  .search-item:last-child{border-bottom:none;}
+  .search-item:hover{background:var(--paper);}
+  .search-empty{padding:10px 13px; font-size:13px; color:var(--muted);}
+
+  .legend{
+    display:flex; align-items:center; gap:16px; margin-top:14px;
+    font-size:12px; color:#E7D9BA;
+  }
+  .legend .dot{
+    display:inline-block; width:10px; height:10px; border-radius:50%;
+    margin-right:6px; vertical-align:middle;
+  }
+  .legend .dot.blood{background:var(--blood-border);}
+  .legend .dot.spouse{background:var(--spouse-border);}
+
+  /* Tree area (pan & zoom canvas) */
+  main{flex:1; overflow:hidden; padding:0; position:relative; display:flex; flex-direction:column;}
+  .canvas-wrap{
+    flex:1; overflow:hidden; position:relative;
+    cursor:grab;
+    touch-action:none;
+    background:var(--paper);
+  }
+  .canvas-wrap.dragging{cursor:grabbing;}
+  .canvas-inner{
+    position:absolute; top:0; left:0;
+    transform-origin:0 0;
+    padding:40px 24px 80px;
+    will-change:transform;
+  }
   .tree-scroll{min-width:max-content; margin:0 auto;}
+
+  .zoom-controls{
+    position:fixed; right:20px; bottom:22px; z-index:20;
+    display:flex; flex-direction:column; gap:7px;
+  }
+  .zoom-controls button{
+    width:38px; height:38px; border-radius:10px;
+    border:1px solid var(--paper-2); background:var(--card);
+    box-shadow:var(--shadow);
+    font-size:18px; font-weight:700; color:var(--ink);
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Inter',sans-serif;
+    padding:0;
+  }
+  .zoom-controls button:hover{border-color:var(--gold); color:var(--gold);}
+  .zoom-controls #zoomReset{font-size:15px;}
+
   .tree{ text-align:center; }
   .tree ul{
     display:flex;
@@ -123,6 +192,25 @@
   }
   .tree > ul > li{padding-top:0;}
   .tree > ul > li::before, .tree > ul > li::after{display:none;}
+
+  .anchor-multi{display:flex; justify-content:center;}
+  .multi-union-ul{padding-top:30px !important;}
+  .multi-union-ul::before{
+    border-left-color:var(--sage) !important;
+    border-left-style:dashed !important;
+    height:30px !important;
+  }
+  .multi-union-ul > .union-branch{padding-top:30px !important;}
+  .multi-union-ul > .union-branch::before, .multi-union-ul > .union-branch::after{
+    border-color:var(--sage) !important;
+    border-top-style:dashed !important;
+    border-left-style:dashed !important;
+    height:30px !important;
+  }
+  .branch-label{
+    font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.05em;
+    color:var(--sage-dark); margin-bottom:6px; text-transform:uppercase;
+  }
 
   .node{display:flex; gap:10px; align-items:flex-end;}
 
@@ -159,6 +247,26 @@
     transform:translateY(-2px);
     border-color:var(--gold);
   }
+  .card.blood{border-left:4px solid var(--blood-border);}
+  .card.spouse{border-left:4px solid var(--spouse-border);}
+
+  @keyframes highlightPulse{
+    0%{box-shadow:0 0 0 0 rgba(173,134,54,0.55);}
+    70%{box-shadow:0 0 0 14px rgba(173,134,54,0);}
+    100%{box-shadow:0 0 0 0 rgba(173,134,54,0);}
+  }
+  .card.highlight-pulse{animation:highlightPulse 1s ease-out 2;}
+
+  .mini-plus{
+    position:absolute; top:-7px; right:-7px;
+    width:18px; height:18px; border-radius:50%;
+    background:var(--card); border:1px dashed var(--line);
+    color:var(--muted);
+    font-size:11px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .mini-plus:hover{background:var(--gold); color:#2A2010; border-style:solid;}
   .avatar{
     width:38px; height:38px; border-radius:50%;
     flex:none;
@@ -264,6 +372,11 @@
   }
   .sex-btn.active{background:var(--sage); color:#fff; border-color:var(--sage);}
   .sex-btn.active.f{background:var(--wine); border-color:var(--wine);}
+  .blood-btn{
+    flex:1; padding:9px 6px; border-radius:8px; border:1px solid var(--paper-2); background:#fff;
+    cursor:pointer; font-size:12px; font-weight:600; color:var(--muted);
+  }
+  .blood-btn.active{background:var(--gold); color:#2A2010; border-color:var(--gold);}
   .modal-actions{display:flex; gap:10px; margin-top:18px;}
   .modal-actions .btn{flex:1;}
   .btn-danger{background:transparent; border:1px solid #B4485A; color:#B4485A;}
@@ -293,26 +406,43 @@
 <body>
 <div class="app">
   <header>
-    <p class="eyebrow" id="familyEyebrow">Archivo familiar</p>
+    <p class="eyebrow" id="familyEyebrow">🖿 Archivo</p>
     <h1 id="familyTitle">Familia Palomino</h1>
-    <p class="sub">Árbol compartido — cualquiera con este enlace puede ver y editar. Los cambios se guardan automáticamente para todos.</p>
+    <p class="sub">Los cambios se guardan automáticamente.</p>
     <div class="toolbar">
       <button class="btn btn-primary" id="btnAddRoot">+ Agregar persona</button>
       <button class="btn btn-ghost" id="btnResetView" title="Recargar datos guardados">↻ Actualizar</button>
+      <div class="search-wrap">
+        <input type="text" id="searchInput" placeholder="🔍 Buscar persona..." autocomplete="off">
+        <div class="search-results" id="searchResults"></div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot blood"></span>Línea de sangre</span>
+      <span><span class="dot spouse"></span>Cónyuge</span>
     </div>
   </header>
 
   <main>
-    <div id="setupNotice" style="display:none; max-width:640px; margin:0 auto 30px; background:#FFF4E0; border:1px solid #E4C27A; border-radius:12px; padding:18px 20px; font-size:14px; line-height:1.6; color:#5A4420;">
+    <div id="setupNotice" style="display:none; max-width:640px; margin:16px auto 0; background:#FFF4E0; border:1px solid #E4C27A; border-radius:12px; padding:18px 20px; font-size:14px; line-height:1.6; color:#5A4420;">
       <strong>⚠️ Falta configurar la conexión con Google Sheets.</strong><br>
       Abre este archivo .html en un editor de texto, busca la línea que dice <code>APPS_SCRIPT_URL</code> cerca del inicio del &lt;script&gt;, y pega ahí la URL de tu Web App de Google Apps Script. Sigue la guía paso a paso que te entregó Claude.
     </div>
-    <div class="tree-scroll" id="treeScroll">
-      <div id="treeContainer"></div>
-      <div class="unconnected-wrap" id="unconnectedWrap" style="display:none;">
-        <p class="unconnected-title">Personas sin conectar aún</p>
-        <div class="unconnected-list" id="unconnectedList"></div>
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="canvas-inner" id="canvasInner">
+        <div class="tree-scroll" id="treeScroll">
+          <div id="treeContainer"></div>
+          <div class="unconnected-wrap" id="unconnectedWrap" style="display:none;">
+            <p class="unconnected-title">Personas sin conectar aún</p>
+            <div class="unconnected-list" id="unconnectedList"></div>
+          </div>
+        </div>
       </div>
+    </div>
+    <div class="zoom-controls">
+      <button id="zoomIn" title="Acercar">+</button>
+      <button id="zoomReset" title="Restablecer vista">⤾</button>
+      <button id="zoomOut" title="Alejar">−</button>
     </div>
   </main>
 </div>
@@ -342,27 +472,28 @@
 
   let state = null; // {people:{}, unions:{}}
   let currentContext = null; // for modal actions
+  let centerOnCard = null; // assigned once pan/zoom initializes
 
   // ---------- Default seed data (from the user's diagram) ----------
   function seedData(){
     const people = {
-      p1:{id:'p1', name:'Julio Cesar Palomino Meneses', birth:'', death:'', sex:'H', photo:''},
-      p2:{id:'p2', name:'Martha Ines Gomez Anaya', birth:'', death:'', sex:'M', photo:''},
-      p3:{id:'p3', name:'Dina Lucy Palomino de la Cruz', birth:'', death:'', sex:'M', photo:''},
-      p4:{id:'p4', name:'Martha Elizabeth Palomino Gomez', birth:'', death:'', sex:'M', photo:''},
-      p5:{id:'p5', name:'Cesar Julio Palomino Gomez', birth:'', death:'', sex:'H', photo:''},
-      p6:{id:'p6', name:'Aldo Urbano Palomino Gomez', birth:'', death:'', sex:'H', photo:''},
-      p7:{id:'p7', name:'Elba Esther Palomino Gomez', birth:'', death:'', sex:'M', photo:''},
-      p8:{id:'p8', name:'Sandra Patricia Palomino Gomez', birth:'', death:'', sex:'M', photo:''},
-      p9:{id:'p9', name:'Roxana Elvira Palomino Gomez', birth:'', death:'', sex:'M', photo:''},
-      p10:{id:'p10', name:'Ruben Castro Llanos', birth:'', death:'', sex:'H', photo:''},
-      p11:{id:'p11', name:'Angela Giuliana Castro Palomino', birth:'', death:'', sex:'M', photo:''},
-      p12:{id:'p12', name:'Mabel Alexandra Castro Palomino', birth:'', death:'', sex:'M', photo:''},
-      p13:{id:'p13', name:'Luisa Torres Vilca', birth:'', death:'', sex:'M', photo:''},
-      p14:{id:'p14', name:'Rosa Ines Palomino Torres', birth:'', death:'', sex:'M', photo:''},
-      p15:{id:'p15', name:'Laura Judith Palomino Torres', birth:'', death:'', sex:'M', photo:''},
-      p16:{id:'p16', name:'Claudia Isabel Palomino Torres', birth:'', death:'', sex:'M', photo:''},
-      p17:{id:'p17', name:'Maria Luisa Palomino Torres', birth:'', death:'', sex:'M', photo:''}
+      p1:{id:'p1', name:'Julio Cesar Palomino Meneses', birth:'', death:'', sex:'H', photo:'', blood:true},
+      p2:{id:'p2', name:'Martha Ines Gomez Anaya', birth:'', death:'', sex:'M', photo:'', blood:false},
+      p3:{id:'p3', name:'Dina Lucy Palomino de la Cruz', birth:'', death:'', sex:'M', photo:'', blood:true},
+      p4:{id:'p4', name:'Martha Elizabeth Palomino Gomez', birth:'', death:'', sex:'M', photo:'', blood:true},
+      p5:{id:'p5', name:'Cesar Julio Palomino Gomez', birth:'', death:'', sex:'H', photo:'', blood:true},
+      p6:{id:'p6', name:'Aldo Urbano Palomino Gomez', birth:'', death:'', sex:'H', photo:'', blood:true},
+      p7:{id:'p7', name:'Elba Esther Palomino Gomez', birth:'', death:'', sex:'M', photo:'', blood:true},
+      p8:{id:'p8', name:'Sandra Patricia Palomino Gomez', birth:'', death:'', sex:'M', photo:'', blood:true},
+      p9:{id:'p9', name:'Roxana Elvira Palomino Gomez', birth:'', death:'', sex:'M', photo:'', blood:true},
+      p10:{id:'p10', name:'Ruben Castro Llanos', birth:'', death:'', sex:'H', photo:'', blood:false},
+      p11:{id:'p11', name:'Angela Giuliana Castro Palomino', birth:'', death:'', sex:'M', photo:'', blood:true},
+      p12:{id:'p12', name:'Mabel Alexandra Castro Palomino', birth:'', death:'', sex:'M', photo:'', blood:true},
+      p13:{id:'p13', name:'Luisa Torres Vilca', birth:'', death:'', sex:'M', photo:'', blood:false},
+      p14:{id:'p14', name:'Rosa Ines Palomino Torres', birth:'', death:'', sex:'M', photo:'', blood:true},
+      p15:{id:'p15', name:'Laura Judith Palomino Torres', birth:'', death:'', sex:'M', photo:'', blood:true},
+      p16:{id:'p16', name:'Claudia Isabel Palomino Torres', birth:'', death:'', sex:'M', photo:'', blood:true},
+      p17:{id:'p17', name:'Maria Luisa Palomino Torres', birth:'', death:'', sex:'M', photo:'', blood:true}
     };
     const unions = {
       u1:{id:'u1', partners:['p1','p2'], children:['p3','p4','p5','p6','p7','p8','p9']},
@@ -376,7 +507,7 @@
 
   // ---------- Storage (Google Sheets vía Google Apps Script) ----------
   function isConfigured(){
-    return APPS_SCRIPT_URL && APPS_SCRIPT_URL.indexOf('PASTE_YOUR_URL_HERE') === -1;
+    return APPS_SCRIPT_URL && APPS_SCRIPT_URL.indexOf('https://script.google.com/macros/s/AKfycbytmvi1hzHh3iEFm60P1VgyUEh00xVqiK5OCHmdYmqkW2uU9rohUxWXpC5atLquTiua/exec') === -1;
   }
 
   async function loadState(){
@@ -440,6 +571,9 @@
   function findUnionByPartner(personId){
     return Object.values(state.unions).find(u => u.partners.includes(personId));
   }
+  function allUnionsByPartner(personId){
+    return Object.values(state.unions).filter(u => u.partners.includes(personId));
+  }
   function allChildIds(){
     const set = new Set();
     Object.values(state.unions).forEach(u => u.children.forEach(c=>set.add(c)));
@@ -495,10 +629,11 @@
       ? `<img src="${escapeAttr(p.photo)}" alt="">`
       : initials(p.name || '?');
     const sexClass = p.sex === 'M' ? 'f' : '';
+    const bloodClass = p.blood === false ? 'spouse' : 'blood';
     const dl = datesLabel(p);
     const card = `
-      <div class="card" data-person="${p.id}">
-        <div class="avatar ${sexClass}">${p.photo ? av : av}</div>
+      <div class="card ${bloodClass}" data-person="${p.id}">
+        <div class="avatar ${sexClass}">${av}</div>
         <div>
           <div class="name">${escapeHtml(p.name || 'Sin nombre')}</div>
           ${dl ? `<div class="dates">${dl}</div>` : ''}
@@ -512,47 +647,80 @@
       </div>`;
   }
 
-  function renderEntityLi(type, id, childIdsSet){
+  // Builds the node (couple/person box) markup for a union or lone person.
+  // hidePartnerId: when set, that partner's card is skipped (already shown as the shared anchor above it).
+  function buildNode(type, id, childIdsSet, hidePartnerId){
     let nodeHtml = '';
     let childrenIds = [];
-
+    let addChildTarget = '';
     if(type === 'union'){
       const u = state.unions[id];
       nodeHtml = '<div class="node">';
-      u.partners.forEach((pid, idx) => {
-        nodeHtml += personCardHTML(state.people[pid], childIdsSet);
+      u.partners.forEach(pid => {
+        if(pid === hidePartnerId) return;
+        const cardHtml = personCardHTML(state.people[pid], childIdsSet);
+        nodeHtml += `<div style="position:relative;">${cardHtml}<button class="mini-plus" data-add-spouse-person="${pid}" title="Agregar otra pareja">+</button></div>`;
       });
       if(u.partners.length < 2){
         nodeHtml += `<div class="union-plus" data-add-spouse-union="${u.id}" title="Agregar cónyuge">+</div>`;
       }
       nodeHtml += '</div>';
       childrenIds = u.children;
+      addChildTarget = u.id;
     } else {
       const p = state.people[id];
       nodeHtml = '<div class="node">' + personCardHTML(p, childIdsSet);
       nodeHtml += `<div class="union-plus" data-add-spouse-person="${id}" title="Agregar cónyuge">+</div>`;
       nodeHtml += '</div>';
+      addChildTarget = 'person:' + id;
     }
+    return {nodeHtml, childrenIds, addChildTarget};
+  }
 
-    let li = '<li><div class="node-wrap">' + nodeHtml;
-    const addChildTarget = type === 'union' ? id : ('person:' + id);
-    li += `<div style="display:flex; justify-content:center;"><button class="child-add" data-add-child="${addChildTarget}" title="Agregar hijo/a">+</button></div>`;
-    li += '</div>';
+  function nodeBlockHTML(built){
+    let html = '<div class="node-wrap">' + built.nodeHtml;
+    html += `<div style="display:flex; justify-content:center;"><button class="child-add" data-add-child="${built.addChildTarget}" title="Agregar hijo/a">+</button></div>`;
+    html += '</div>';
+    return html;
+  }
 
-    if(childrenIds.length){
-      li += '<ul>';
-      childrenIds.forEach(cid => {
-        const cu = findUnionByPartner(cid);
-        if(cu){
-          li += renderEntityLi('union', cu.id, childIdsSet);
-        } else {
-          li += renderEntityLi('person', cid, childIdsSet);
-        }
-      });
-      li += '</ul>';
+  function renderChildrenUl(childrenIds, childIdsSet){
+    if(!childrenIds.length) return '';
+    let html = '<ul>';
+    childrenIds.forEach(cid => { html += renderChildSlot(cid, childIdsSet); });
+    html += '</ul>';
+    return html;
+  }
+
+  // Renders one child's slot within its parents' row. If that person had children
+  // with more than one partner, shows them once as a shared anchor with a dashed
+  // branch per additional union (so remarriages don't disappear from the tree).
+  function renderChildSlot(cid, childIdsSet){
+    const unions = allUnionsByPartner(cid);
+    if(unions.length <= 1){
+      const built = unions.length === 1
+        ? buildNode('union', unions[0].id, childIdsSet)
+        : buildNode('person', cid, childIdsSet);
+      return '<li>' + nodeBlockHTML(built) + renderChildrenUl(built.childrenIds, childIdsSet) + '</li>';
     }
-    li += '</li>';
-    return li;
+    let html = '<li>';
+    html += `<div class="anchor-multi"><div class="node">${personCardHTML(state.people[cid], childIdsSet)}<div class="union-plus" data-add-spouse-person="${cid}" title="Agregar otra pareja">+</div></div></div>`;
+    html += '<ul class="multi-union-ul">';
+    unions.forEach((u, idx)=>{
+      const built = buildNode('union', u.id, childIdsSet, cid);
+      html += '<li class="union-branch">';
+      html += `<div class="branch-label">${idx===0 ? 'Con' : 'También con'}</div>`;
+      html += nodeBlockHTML(built);
+      html += renderChildrenUl(built.childrenIds, childIdsSet);
+      html += '</li>';
+    });
+    html += '</ul></li>';
+    return html;
+  }
+
+  function renderEntityLi(type, id, childIdsSet){
+    const built = buildNode(type, id, childIdsSet);
+    return '<li>' + nodeBlockHTML(built) + renderChildrenUl(built.childrenIds, childIdsSet) + '</li>';
   }
 
   function escapeHtml(str){
@@ -599,8 +767,9 @@
   document.getElementById('modalClose').onclick = closeModal;
   overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeModal(); });
 
-  function personFormFields(p){
+  function personFormFields(p, defaultBlood){
     p = p || {name:'', birth:'', death:'', sex:'H', photo:''};
+    const bloodVal = (p.blood !== undefined) ? p.blood : (defaultBlood !== undefined ? defaultBlood : true);
     return `
       <div class="field">
         <label>Nombre completo *</label>
@@ -624,6 +793,13 @@
         </div>
       </div>
       <div class="field">
+        <label>Vínculo con la familia</label>
+        <div class="sex-toggle">
+          <button type="button" class="blood-btn ${bloodVal?'active':''}" data-blood="1">Línea de sangre</button>
+          <button type="button" class="blood-btn ${!bloodVal?'active':''}" data-blood="0">Cónyuge (se unió por matrimonio)</button>
+        </div>
+      </div>
+      <div class="field">
         <label>Foto (URL, opcional)</label>
         <input type="url" id="f_photo" value="${escapeAttr(p.photo)}" placeholder="https://...">
       </div>
@@ -638,16 +814,29 @@
         btn.classList.add('active');
       };
     });
+    wireBloodToggle();
+  }
+  function wireBloodToggle(){
+    document.querySelectorAll('.blood-btn').forEach(btn=>{
+      btn.onclick = ()=>{
+        document.querySelectorAll('.blood-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+      };
+    });
   }
   function getSelectedSex(){
     const active = document.querySelector('.sex-btn.active');
     return active ? active.getAttribute('data-sex') : 'H';
   }
+  function getSelectedBlood(){
+    const active = document.querySelector('.blood-btn.active');
+    return active ? active.getAttribute('data-blood') === '1' : true;
+  }
 
   // Add root / standalone person
   document.getElementById('btnAddRoot').onclick = ()=>{
     currentContext = {mode:'root'};
-    openModal('Agregar persona', personFormFields() + `
+    openModal('Agregar persona', personFormFields(null, true) + `
       <div class="modal-actions">
         <button class="btn btn-secondary" id="cancelBtn">Cancelar</button>
         <button class="btn btn-primary" id="saveBtn">Guardar</button>
@@ -671,7 +860,7 @@
           ${existingOptions ? '<option value="existing">Vincular persona existente sin pareja</option>' : ''}
         </select>
       </div>
-      <div id="dynamicFields">${personFormFields()}</div>
+      <div id="dynamicFields">${personFormFields(null, false)}</div>
       <div class="modal-actions">
         <button class="btn btn-secondary" id="cancelBtn">Cancelar</button>
         <button class="btn btn-primary" id="saveBtn">Guardar</button>
@@ -684,7 +873,7 @@
         dyn.innerHTML = `<div class="field"><label>Selecciona persona</label>
           <select id="f_existing">${existingOptions}</select></div>`;
       } else {
-        dyn.innerHTML = personFormFields();
+        dyn.innerHTML = personFormFields(null, false);
         wireSexToggle();
       }
     };
@@ -706,7 +895,8 @@
         birth:document.getElementById('f_birth').value,
         death:document.getElementById('f_death').value,
         sex:getSelectedSex(),
-        photo:document.getElementById('f_photo').value.trim()
+        photo:document.getElementById('f_photo').value.trim(),
+        blood:getSelectedBlood()
       };
     }
 
@@ -735,7 +925,7 @@
           <option value="existing">Vincular persona ya existente</option>
         </select>
       </div>
-      <div id="dynamicFields">${personFormFields()}</div>
+      <div id="dynamicFields">${personFormFields(null, true)}</div>
       <div class="modal-actions">
         <button class="btn btn-secondary" id="cancelBtn">Cancelar</button>
         <button class="btn btn-primary" id="saveBtn">Guardar</button>
@@ -748,7 +938,7 @@
         dyn.innerHTML = `<div class="field"><label>Selecciona persona</label>
           <select id="f_existing">${existingOptions}</select></div>`;
       } else {
-        dyn.innerHTML = personFormFields();
+        dyn.innerHTML = personFormFields(null, true);
         wireSexToggle();
       }
     };
@@ -770,7 +960,8 @@
         birth:document.getElementById('f_birth').value,
         death:document.getElementById('f_death').value,
         sex:getSelectedSex(),
-        photo:document.getElementById('f_photo').value.trim()
+        photo:document.getElementById('f_photo').value.trim(),
+        blood:getSelectedBlood()
       };
     }
 
@@ -884,7 +1075,8 @@
           birth:document.getElementById('father_birth').value,
           death:document.getElementById('father_death').value,
           sex:'H',
-          photo:document.getElementById('father_photo').value.trim()
+          photo:document.getElementById('father_photo').value.trim(),
+          blood:true
         };
       }
     }
@@ -899,7 +1091,8 @@
           birth:document.getElementById('mother_birth').value,
           death:document.getElementById('mother_death').value,
           sex:'M',
-          photo:document.getElementById('mother_photo').value.trim()
+          photo:document.getElementById('mother_photo').value.trim(),
+          blood:true
         };
       }
     }
@@ -928,7 +1121,8 @@
       birth:document.getElementById('f_birth').value,
       death:document.getElementById('f_death').value,
       sex:getSelectedSex(),
-      photo:document.getElementById('f_photo').value.trim()
+      photo:document.getElementById('f_photo').value.trim(),
+      blood:getSelectedBlood()
     };
     await saveState();
     closeModal();
@@ -958,6 +1152,7 @@
       p.death = document.getElementById('f_death').value;
       p.sex = getSelectedSex();
       p.photo = document.getElementById('f_photo').value.trim();
+      p.blood = getSelectedBlood();
       await saveState();
       closeModal();
       render();
@@ -990,6 +1185,151 @@
     render();
     showToast('Datos actualizados');
   };
+
+  // ---------- Pan & Zoom ----------
+  (function initPanZoom(){
+    const wrap = document.getElementById('canvasWrap');
+    const inner = document.getElementById('canvasInner');
+    let scale = 1, panX = 24, panY = 12;
+    let isPanning = false, dragged = false;
+    let startX = 0, startY = 0, startPanX = 0, startPanY = 0;
+    let lastTouchDist = null;
+
+    function clampScale(s){ return Math.min(2.2, Math.max(0.35, s)); }
+    function applyTransform(){
+      inner.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    }
+    applyTransform();
+
+    centerOnCard = function(el){
+      if(!el) return;
+      const wrapRect = wrap.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const elCenterX = elRect.left + elRect.width/2 - wrapRect.left;
+      const elCenterY = elRect.top + elRect.height/2 - wrapRect.top;
+      panX += (wrapRect.width/2 - elCenterX);
+      panY += (wrapRect.height/2 - elCenterY);
+      applyTransform();
+    };
+
+    // Mouse drag to pan
+    wrap.addEventListener('mousedown', (e)=>{
+      isPanning = true; dragged = false;
+      startX = e.clientX; startY = e.clientY;
+      startPanX = panX; startPanY = panY;
+      wrap.classList.add('dragging');
+    });
+    window.addEventListener('mousemove', (e)=>{
+      if(!isPanning) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      if(Math.abs(dx) > 3 || Math.abs(dy) > 3) dragged = true;
+      panX = startPanX + dx; panY = startPanY + dy;
+      applyTransform();
+    });
+    window.addEventListener('mouseup', ()=>{
+      isPanning = false;
+      wrap.classList.remove('dragging');
+    });
+
+    // Avoid opening a card's modal right after a drag
+    wrap.addEventListener('click', (e)=>{
+      if(dragged){ e.stopPropagation(); e.preventDefault(); dragged = false; }
+    }, true);
+
+    // Touch: one finger pans, two fingers pinch-zoom
+    function touchDist(t){
+      const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+      return Math.sqrt(dx*dx + dy*dy);
+    }
+    wrap.addEventListener('touchstart', (e)=>{
+      if(e.touches.length === 1){
+        isPanning = true; dragged = false;
+        startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+        startPanX = panX; startPanY = panY;
+      } else if(e.touches.length === 2){
+        isPanning = false;
+        lastTouchDist = touchDist(e.touches);
+      }
+    }, {passive:true});
+    wrap.addEventListener('touchmove', (e)=>{
+      if(e.touches.length === 1 && isPanning){
+        const dx = e.touches[0].clientX - startX, dy = e.touches[0].clientY - startY;
+        if(Math.abs(dx) > 3 || Math.abs(dy) > 3) dragged = true;
+        panX = startPanX + dx; panY = startPanY + dy;
+        applyTransform();
+      } else if(e.touches.length === 2){
+        const dist = touchDist(e.touches);
+        if(lastTouchDist){
+          scale = clampScale(scale * (dist / lastTouchDist));
+          applyTransform();
+        }
+        lastTouchDist = dist;
+      }
+    }, {passive:true});
+    wrap.addEventListener('touchend', ()=>{ isPanning = false; lastTouchDist = null; });
+
+    // Scroll wheel zoom
+    wrap.addEventListener('wheel', (e)=>{
+      e.preventDefault();
+      scale = clampScale(scale + (e.deltaY > 0 ? -0.08 : 0.08));
+      applyTransform();
+    }, {passive:false});
+
+    // Buttons
+    document.getElementById('zoomIn').onclick = ()=>{ scale = clampScale(scale + 0.15); applyTransform(); };
+    document.getElementById('zoomOut').onclick = ()=>{ scale = clampScale(scale - 0.15); applyTransform(); };
+    document.getElementById('zoomReset').onclick = ()=>{ scale = 1; panX = 24; panY = 12; applyTransform(); };
+  })();
+
+  // ---------- Buscador ----------
+  function normalizeText(str){
+    return (str||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  }
+  (function initSearch(){
+    const input = document.getElementById('searchInput');
+    const results = document.getElementById('searchResults');
+
+    function closeResults(){ results.classList.remove('open'); results.innerHTML=''; }
+
+    input.addEventListener('input', ()=>{
+      const q = normalizeText(input.value.trim());
+      if(!q){ closeResults(); return; }
+      const matches = Object.values(state.people)
+        .filter(p => normalizeText(p.name).includes(q))
+        .slice(0, 8);
+      if(!matches.length){
+        results.innerHTML = '<div class="search-empty">Sin resultados</div>';
+        results.classList.add('open');
+        return;
+      }
+      results.innerHTML = matches.map(p =>
+        `<div class="search-item" data-goto="${p.id}">${escapeHtml(p.name)}</div>`
+      ).join('');
+      results.classList.add('open');
+      results.querySelectorAll('.search-item').forEach(el=>{
+        el.onclick = ()=>{
+          goToPerson(el.getAttribute('data-goto'));
+          closeResults();
+          input.value = '';
+        };
+      });
+    });
+
+    document.addEventListener('click', (e)=>{
+      if(!e.target.closest('.search-wrap')) closeResults();
+    });
+    input.addEventListener('keydown', (e)=>{
+      if(e.key === 'Escape'){ closeResults(); input.blur(); }
+    });
+  })();
+
+  function goToPerson(id){
+    const card = document.querySelector(`.card[data-person="${id}"]`);
+    if(!card){ showToast('No se encontró a esa persona'); return; }
+    if(centerOnCard) centerOnCard(card);
+    card.classList.add('highlight-pulse');
+    setTimeout(()=>card.classList.remove('highlight-pulse'), 2000);
+  }
 
   // ---------- Init ----------
   (async function init(){
