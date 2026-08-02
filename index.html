@@ -351,6 +351,30 @@
   }
   .child-add:hover{border-color:var(--gold); color:var(--gold);}
 
+  .node-actions{display:flex; justify-content:center; align-items:center; gap:7px; margin-top:8px;}
+
+  .collapse-toggle{
+    width:22px; height:22px; border-radius:50%;
+    border:1px solid var(--paper-2); background:var(--card);
+    box-shadow:var(--shadow);
+    color:var(--muted); font-size:11px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    padding:0;
+  }
+  .collapse-toggle:hover{border-color:var(--gold); color:var(--gold);}
+
+  .collapse-badge{
+    margin-top:44px;
+    padding:7px 16px; border-radius:20px;
+    border:1px solid var(--gold); background:var(--card);
+    box-shadow:var(--shadow);
+    color:var(--wine-dark);
+    font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.02em;
+    cursor:pointer; white-space:nowrap;
+  }
+  .collapse-badge:hover{background:var(--gold); color:#2A2010;}
+
   .unconnected-wrap{
     max-width:900px; margin:56px auto 0; padding-top:28px; border-top:1px dashed var(--paper-2);
   }
@@ -438,12 +462,14 @@
 <body>
 <div class="app">
   <header>
-    <p class="eyebrow" id="familyEyebrow">🖿 Archivo</p>
+     <p class="eyebrow" id="familyEyebrow">🖿 Archivo</p>
     <h1 id="familyTitle">Familia Palomino</h1>
     <p class="sub">Los cambios se guardan automáticamente.</p>
     <div class="toolbar">
       <button class="btn btn-primary" id="btnAddRoot">+ Agregar persona</button>
       <button class="btn btn-ghost" id="btnResetView" title="Recargar datos guardados">↻ Actualizar</button>
+      <button class="btn btn-ghost" id="btnCollapseAll" title="Contraer todas las ramas">⊟ Contraer todo</button>
+      <button class="btn btn-ghost" id="btnExpandAll" title="Expandir todas las ramas">⊞ Expandir todo</button>
       <div class="search-wrap">
         <input type="text" id="searchInput" placeholder="🔍 Buscar persona..." autocomplete="off">
         <div class="search-results" id="searchResults"></div>
@@ -505,6 +531,7 @@
   let state = null; // {people:{}, unions:{}}
   let currentContext = null; // for modal actions
   let centerOnCard = null; // assigned once pan/zoom initializes
+  let collapsedKeys = new Set(); // union ids currently collapsed (per-viewing-session, not saved)
 
   // ---------- Default seed data (from the user's diagram) ----------
   function seedData(){
@@ -726,10 +753,42 @@
   }
 
   function nodeBlockHTML(built){
+    const key = built.addChildTarget;
+    const hasChildren = built.childrenIds && built.childrenIds.length > 0;
+    const isCollapsed = collapsedKeys.has(key);
     let html = '<div class="node-wrap">' + built.nodeHtml;
-    html += `<div style="display:flex; justify-content:center;"><button class="child-add" data-add-child="${built.addChildTarget}" title="Agregar hijo/a">+</button></div>`;
+    html += '<div class="node-actions">';
+    if(hasChildren){
+      html += `<button class="collapse-toggle" data-collapse-key="${key}" title="${isCollapsed ? 'Expandir rama' : 'Contraer rama'}">${isCollapsed ? '▸' : '▾'}</button>`;
+    }
+    html += `<button class="child-add" data-add-child="${key}" title="Agregar hijo/a">+</button>`;
+    html += '</div>';
     html += '</div>';
     return html;
+  }
+
+  function childrenBlockHTML(built, childIdsSet){
+    const key = built.addChildTarget;
+    if(built.childrenIds.length && collapsedKeys.has(key)){
+      const count = countDescendants(built.childrenIds);
+      return `<ul><li class="collapsed-summary"><button class="collapse-badge" data-collapse-key="${key}" title="Expandir rama">+${count} más</button></li></ul>`;
+    }
+    return renderChildrenUl(built.childrenIds, childIdsSet);
+  }
+
+  function countDescendants(childrenIds){
+    let count = 0;
+    const seen = new Set();
+    function walk(ids){
+      ids.forEach(cid=>{
+        if(seen.has(cid)) return;
+        seen.add(cid);
+        count++;
+        allUnionsByPartner(cid).forEach(u => walk(u.children));
+      });
+    }
+    walk(childrenIds);
+    return count;
   }
 
   function renderChildrenUl(childrenIds, childIdsSet){
@@ -749,7 +808,7 @@
       const built = unions.length === 1
         ? buildNode('union', unions[0].id, childIdsSet)
         : buildNode('person', cid, childIdsSet);
-      return '<li>' + nodeBlockHTML(built) + renderChildrenUl(built.childrenIds, childIdsSet) + '</li>';
+      return '<li>' + nodeBlockHTML(built) + childrenBlockHTML(built, childIdsSet) + '</li>';
     }
     let html = '<li>';
     html += `<div class="anchor-multi"><div class="node">${personCardHTML(state.people[cid], childIdsSet)}<div class="union-plus" data-add-spouse-person="${cid}" title="Agregar otra pareja">+</div></div></div>`;
@@ -757,9 +816,9 @@
     unions.forEach((u, idx)=>{
       const built = buildNode('union', u.id, childIdsSet, cid);
       html += '<li class="union-branch">';
-      html += `<div class="branch-label">${idx===0 ? 'Con' : 'También con'}</div>`;
+      html += `<div class="branch-label">${idx===0 ? 'Con' : 'Con'}</div>`;
       html += nodeBlockHTML(built);
-      html += renderChildrenUl(built.childrenIds, childIdsSet);
+      html += childrenBlockHTML(built, childIdsSet);
       html += '</li>';
     });
     html += '</ul></li>';
@@ -768,7 +827,7 @@
 
   function renderEntityLi(type, id, childIdsSet){
     const built = buildNode(type, id, childIdsSet);
-    return '<li>' + nodeBlockHTML(built) + renderChildrenUl(built.childrenIds, childIdsSet) + '</li>';
+    return '<li>' + nodeBlockHTML(built) + childrenBlockHTML(built, childIdsSet) + '</li>';
   }
 
   function escapeHtml(str){
@@ -807,6 +866,14 @@
     });
     document.querySelectorAll('[data-add-parent]').forEach(el=>{
       el.onclick = (e)=>{ e.stopPropagation(); openAddParents(el.getAttribute('data-add-parent')); };
+    });
+    document.querySelectorAll('[data-collapse-key]').forEach(el=>{
+      el.onclick = (e)=>{
+        e.stopPropagation();
+        const key = el.getAttribute('data-collapse-key');
+        if(collapsedKeys.has(key)) collapsedKeys.delete(key); else collapsedKeys.add(key);
+        render();
+      };
     });
   }
 
@@ -856,7 +923,7 @@
         <label>Vínculo con la familia</label>
         <div class="sex-toggle">
           <button type="button" class="blood-btn ${bloodVal?'active':''}" data-blood="1">Línea de sangre</button>
-          <button type="button" class="blood-btn ${!bloodVal?'active':''}" data-blood="0">Cónyuge (se unió por matrimonio)</button>
+          <button type="button" class="blood-btn ${!bloodVal?'active':''}" data-blood="0">Cónyuge</button>
         </div>
       </div>
       <div class="field">
@@ -1241,6 +1308,18 @@
     showToast('Datos actualizados');
   };
 
+  document.getElementById('btnCollapseAll').onclick = ()=>{
+    Object.values(state.unions).forEach(u=>{
+      if(u.children.length > 0) collapsedKeys.add(u.id);
+    });
+    render();
+  };
+
+  document.getElementById('btnExpandAll').onclick = ()=>{
+    collapsedKeys.clear();
+    render();
+  };
+
   // ---------- Pan & Zoom ----------
   (function initPanZoom(){
     const wrap = document.getElementById('canvasWrap');
@@ -1384,7 +1463,32 @@
     });
   })();
 
+  function buildChildToParentUnionMap(){
+    const map = {};
+    Object.values(state.unions).forEach(u=>{
+      u.children.forEach(cid => { map[cid] = u.id; });
+    });
+    return map;
+  }
+
+  function expandAncestorsOf(personId){
+    const map = buildChildToParentUnionMap();
+    let current = personId;
+    let guard = 0;
+    while(map[current] && guard < 50){
+      const unionId = map[current];
+      collapsedKeys.delete(unionId);
+      const union = state.unions[unionId];
+      const nextPartner = union.partners.find(pid => map[pid]);
+      if(!nextPartner) break;
+      current = nextPartner;
+      guard++;
+    }
+  }
+
   function goToPerson(id){
+    expandAncestorsOf(id);
+    render();
     const card = document.querySelector(`.card[data-person="${id}"]`);
     if(!card){ showToast('No se encontró a esa persona'); return; }
     if(centerOnCard) centerOnCard(card);
