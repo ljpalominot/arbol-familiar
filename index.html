@@ -1563,6 +1563,15 @@
   if(initialCard) centerOnCard(initialCard.closest('.card'));
   
   })();
+
+  // Las tipografías especiales cargan un instante después del primer dibujo,
+  // y eso puede cambiar el ancho de las tarjetas. Volvemos a medir las barras
+  // conectoras una vez que las fuentes terminan de cargar, y también si la
+  // ventana cambia de tamaño.
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(()=>{ positionMultiUnionConnectors(); });
+  }
+  window.addEventListener('resize', ()=>{ positionMultiUnionConnectors(); });
 })();
 </script>
 </body>
