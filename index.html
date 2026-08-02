@@ -373,7 +373,7 @@
   .sex-btn.active{background:var(--sage); color:#fff; border-color:var(--sage);}
   .sex-btn.active.f{background:var(--wine); border-color:var(--wine);}
   .blood-btn{
-    flex:1; padding:9px 6px; border-radius:8px; border:1px solid var(--paper-2); background:#fff;
+    flex:1; padding:9px 6px; border-radius:8px; border:5px solid var(--paper-2); background:#fff;
     cursor:pointer; font-size:12px; font-weight:600; color:var(--muted);
   }
   .blood-btn.active{background:var(--gold); color:#2A2010; border-color:var(--gold);}
@@ -793,10 +793,10 @@
         </div>
       </div>
       <div class="field">
-        <label>Vínculo con la familia</label>
+        <label>Vínculo</label>
         <div class="sex-toggle">
           <button type="button" class="blood-btn ${bloodVal?'active':''}" data-blood="1">Línea de sangre</button>
-          <button type="button" class="blood-btn ${!bloodVal?'active':''}" data-blood="0">Cónyuge (se unió por matrimonio)</button>
+          <button type="button" class="blood-btn ${!bloodVal?'active':''}" data-blood="0">Cónyuge </button>
         </div>
       </div>
       <div class="field">
