@@ -1413,6 +1413,14 @@
     document.getElementById('zoomIn').onclick = ()=>{ scale = clampScale(scale + 0.15); applyTransform(); };
     document.getElementById('zoomOut').onclick = ()=>{ scale = clampScale(scale - 0.15); applyTransform(); };
     document.getElementById('zoomReset').onclick = ()=>{ scale = 1; panX = 24; panY = 12; applyTransform(); };
+	document.getElementById('zoomReset').onclick = ()=>{
+	scale = 1;
+	applyTransform();
+	const card = Array.from(document.querySelectorAll('.card .name'))
+		.find(el => el.textContent.trim() === 'Urbano Palomino Villalobos');
+	if(card) centerOnCard(card.closest('.card'));
+};
+	
   })();
 
   document.addEventListener('click', (e)=>{
